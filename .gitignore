@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+
+# colcon
+build/
+install/
+log/
+
+# Datos locales y credenciales: nunca al repositorio
+*.log
+*.bag
+*.db3
+*.mcap
+.env
+*.pem
+*.key
+clave_invitados.txt

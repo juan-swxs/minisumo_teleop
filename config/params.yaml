@@ -1,0 +1,34 @@
+# Parametros iniciales. Casi todos se pueden cambiar en vivo desde el
+# tablero (pestana Ajustes).
+glove_teleop:
+  ros__parameters:
+    strategy: 2            # 1 = plano (velocidad de la mano), 2 = inclinacion (pitch/roll)
+    source: ekf            # estimador para la estrategia 1 y el borde: ekf | ukf | odom
+    glove_input: filtered  # filtered = fusion Mahony (MPU6050) | raw = acelerometro sin filtrar
+    v_max: 0.45            # m/s (mismos ajustes que el mando por ESP-NOW del carro)
+    w_max: 4.5             # rad/s
+    v_min: 0.14            # m/s al salir de la zona muerta (~4.2 rad/s por rueda, DRV8833)
+    w_min: 1.8             # rad/s al salir de la zona muerta (~4.1 rad/s por rueda)
+    deadzone_deg: 8.0
+    deadzone_exit_deg: 5.0
+    full_tilt_deg: 35.0
+    expo: 1.6
+    plane_gain: 1.0        # con 2.0 casi siempre llegaba al tope de 0.45 m/s
+    plane_stroke_max: 0.8  # s: duracion maxima de un trazo (estrategia 1)
+    heading_kp: 3.5
+    dojo_radius: 2.5       # dojo de 5 m de diametro (espacio amplio)
+    guard_margin: 0.05
+    guard_lookahead: 0.45
+
+robot_estimator:
+  ros__parameters:
+    input_mode: raw        # raw = giroscopio crudo (estima sesgo) | filtered
+    tf_source: ekf
+    dojo_radius: 2.5
+
+hand_estimator:
+  ros__parameters:
+    input_mode: filtered   # raw | filtered
+    leak_tau: 0.0          # s: fuga de velocidad (con 0.6 la velocidad cambiaba de signo al frenar)
+    zupt_vmax: 0.15        # m/s
+    zupt_long: 0.3         # s

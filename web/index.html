@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="es" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teleoperación Minisumo</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%237c6cff'/><stop offset='1' stop-color='%2322d3ee'/></linearGradient></defs><rect width='32' height='32' rx='9' fill='url(%23g)'/><circle cx='16' cy='16' r='7' fill='none' stroke='white' stroke-width='2.5'/></svg>">
+<link rel="stylesheet" href="vendor/uPlot.min.css">
+<link rel="stylesheet" href="app.css">
+<script>
+  try { const t = localStorage.getItem('theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
+<script type="importmap">
+  { "imports": {
+      "three": "./vendor/three/three.module.min.js",
+      "three/addons/": "./vendor/three/addons/"
+  } }
+</script>
+</head>
+<body>
+<div class="app">
+
+  <!-- ================= Navegacion ================= -->
+  <aside class="rail">
+    <div class="brand">
+      <div class="logo"><i data-lucide="radar"></i></div>
+      <div class="brand-txt"><b>Minisumo</b><span>Teleoperación · Kalman</span></div>
+    </div>
+
+    <div class="nav-group">Operación</div>
+    <button class="nav-btn active" data-view="teleop" title="Teleop">
+      <span class="nav-ico"><i data-lucide="gamepad-2"></i></span>
+      <span class="nav-txt"><b>Teleop</b><small>Mando y dojo 3D</small></span>
+      <span class="nav-badge" id="nb-teleop"></span>
+    </button>
+    <button class="nav-btn" data-view="energy" title="Energía">
+      <span class="nav-ico"><i data-lucide="battery-medium"></i></span>
+      <span class="nav-txt"><b>Energía</b><small>Alimentación · INA219</small></span>
+      <span class="nav-badge" id="nb-energy"></span>
+    </button>
+
+    <div class="nav-group">Análisis</div>
+    <button class="nav-btn" data-view="signals" title="Señales">
+      <span class="nav-ico"><i data-lucide="activity"></i></span>
+      <span class="nav-txt"><b>Señales</b><small>Crudo vs filtrado</small></span>
+    </button>
+    <button class="nav-btn" data-view="kalman" title="Kalman">
+      <span class="nav-ico"><i data-lucide="sigma"></i></span>
+      <span class="nav-txt"><b>Kalman</b><small>EKF vs UKF</small></span>
+    </button>
+    <button class="nav-btn" data-view="experiments" title="Pruebas">
+      <span class="nav-ico"><i data-lucide="table-2"></i></span>
+      <span class="nav-txt"><b>Pruebas</b><small>Tablas de la guía</small></span>
+    </button>
+    <button class="nav-btn" data-view="offline" title="Offline">
+      <span class="nav-ico"><i data-lucide="database"></i></span>
+      <span class="nav-txt"><b>Offline</b><small>Sesiones grabadas</small></span>
+    </button>
+
+    <div class="nav-group">Sistema</div>
+    <button class="nav-btn" data-view="settings" title="Ajustes">
+      <span class="nav-ico"><i data-lucide="sliders-horizontal"></i></span>
+      <span class="nav-txt"><b>Ajustes</b><small>Parámetros en vivo</small></span>
+    </button>
+
+    <div class="spacer"></div>
+    <div class="rail-status" id="rail-status">
+      <span class="dot"></span><span class="rs-txt"><b>Sistema</b><small id="rail-status-txt">conectando…</small></span>
+    </div>
+    <button class="nav-btn nav-pin" id="rail-pin" title="Fijar el menú abierto">
+      <span class="nav-ico"><i data-lucide="panel-left-open"></i></span>
+      <span class="nav-txt"><b>Fijar menú</b><small>Dejarlo siempre abierto</small></span>
+    </button>
+    <button class="nav-btn nav-theme" id="theme-btn" title="Cambiar tema">
+      <span class="nav-ico"><i data-lucide="sun-moon"></i></span>
+      <span class="nav-txt"><b>Tema</b><small>Claro / oscuro</small></span>
+    </button>
+  </aside>
+
+  <main>
+    <!-- ================= Barra superior ================= -->
+    <header class="topbar">
+      <div class="title">
+        <h1>Teleoperación Minisumo</h1>
+        <p>Procesamiento Digital de Señales · Práctica 3 · Filtro de Kalman</p>
+      </div>
+      <div class="grow"></div>
+      <div class="chips">
+        <span class="chip" id="chip-glove"><span class="dot"></span><b>Guante</b><span class="hz">—</span></span>
+        <span class="chip" id="chip-car"><span class="dot"></span><b>Carro</b><span class="hz">—</span></span>
+        <span class="chip" id="chip-est"><span class="dot"></span><b>EKF·UKF</b><span class="hz">—</span></span>
+        <span class="chip" id="chip-teleop"><span class="dot"></span><b>Teleop</b><span class="hz">—</span></span>
+        <span class="chip" id="chip-espnow" title="Enlace directo guante → carro"><span class="dot"></span><b>ESP-NOW</b><span class="hz">—</span></span>
+      </div>
+      <button class="batt-pill nodata" id="batt-pill" title="Alimentación del sistema · clic para ver Energía">
+        <svg viewBox="0 0 30 16" class="batt-ico" aria-hidden="true">
+          <rect x="0.75" y="0.75" width="25.5" height="14.5" rx="3.6" class="b-body"/>
+          <rect x="27.3" y="5" width="2.2" height="6" rx="1" class="b-cap"/>
+          <rect x="2.6" y="2.6" width="21.8" height="10.8" rx="2" class="b-fill" id="batt-pill-fill"/>
+          <path d="M14.5 3.2 L10.6 8.6 H13.6 L12.4 12.8 L16.6 7.2 H13.6 Z" class="b-alert"/>
+        </svg>
+        <span class="batt-pct" id="batt-pill-pct">—</span>
+      </button>
+      <button class="btn rec" id="rec-btn" title="Grabar sesión (CSV)"><span class="rec-dot"></span><span class="txt">Grabar</span></button>
+      <button class="btn" id="sysreset-btn" title="Reiniciar sistema: detiene todo y toma la posición actual del carro como nuevo origen"><i data-lucide="rotate-ccw"></i></button>
+      <button class="btn danger" id="estop-btn" title="Parada de emergencia (Espacio)"><i data-lucide="octagon-x"></i>PARAR</button>
+    </header>
+
+    <div class="banner" id="conn-banner"><i data-lucide="wifi-off"></i><span>Sin conexión con el tablero (nodo <b>dashboard</b>). Reintentando…</span></div>
+
+    <!-- ================= TELEOPERACION ================= -->
+    <section class="view active" id="view-teleop">
+      <div class="grid">
+        <div class="card c4">
+          <div class="card-h"><div class="ico"><i data-lucide="gamepad-2"></i></div><h2>Control</h2></div>
+          <div class="stack">
+            <div class="arm" id="arm">
+              <button class="arm-btn" id="arm-btn" title="Armar / desarmar (A)"><i data-lucide="power"></i></button>
+              <div><h3 id="arm-title">Desarmado</h3><p id="arm-sub">El robot ignora el guante</p></div>
+            </div>
+
+            <div>
+              <div class="label" style="margin-bottom:8px">Enlace guante → carro</div>
+              <div class="seg full" id="seg-link">
+                <button data-v="espnow"><i data-lucide="radio"></i>ESP-NOW directo</button>
+                <button data-v="pc"><i data-lucide="monitor"></i>PC · ROS 2</button>
+              </div>
+              <div class="link-info" id="link-info">—</div>
+            </div>
+
+            <div>
+              <div class="label" style="margin-bottom:8px">Estrategia de comando</div>
+              <div class="seg full" id="seg-strategy">
+                <button data-v="1"><i data-lucide="move"></i>1 · Plano</button>
+                <button data-v="2"><i data-lucide="rotate-3d"></i>2 · Inclinación</button>
+              </div>
+            </div>
+            <div class="row" style="gap:14px; align-items:flex-start">
+              <div style="flex:1">
+                <div class="label" style="margin-bottom:8px">Señal del guante</div>
+                <div class="seg full" id="seg-glove-input">
+                  <button data-v="raw">Cruda</button>
+                  <button data-v="filtered">Filtrada</button>
+                </div>
+              </div>
+              <div style="flex:1">
+                <div class="label" style="margin-bottom:8px">Estimador</div>
+                <div class="seg full" id="seg-source">
+                  <button data-v="ekf">EKF</button>
+                  <button data-v="ukf">UKF</button>
+                  <button data-v="odom">Odom</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="reason" id="reason"><i data-lucide="info"></i><span>—</span></div>
+
+            <div class="gauges">
+              <div class="gauge"><svg viewBox="0 0 120 72" id="g-v"></svg><div class="val"><span id="g-v-val">0.00</span> <span class="unit">m/s</span></div><div class="cap">Velocidad lineal v</div></div>
+              <div class="gauge"><svg viewBox="0 0 120 72" id="g-w"></svg><div class="val"><span id="g-w-val">0.00</span> <span class="unit">rad/s</span></div><div class="cap">Velocidad angular ω</div></div>
+            </div>
+
+            <div class="row" style="flex-wrap:wrap">
+              <button class="btn sm" id="btn-zero"><i data-lucide="crosshair"></i>Postura neutra</button>
+              <button class="btn sm" id="btn-reset-robot"><i data-lucide="locate-fixed"></i>Robot al origen</button>
+              <button class="btn sm ghost" id="btn-clear-trails"><i data-lucide="eraser"></i>Borrar rastro</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card c8 pad0">
+          <div class="card-h">
+            <div class="ico"><i data-lucide="target"></i></div>
+            <div><h2>Dojo</h2><div class="sub" id="dojo-sub">Posición del robot · Ø 5 m</div></div>
+            <div class="right">
+              <button class="btn sm place-btn" id="btn-place" title="Clic aquí y luego clic en el dojo para colocar un destino"><i data-lucide="map-pin-plus"></i>Colocar destino</button>
+              <div class="seg" id="seg-cam"><button data-v="persp" class="on">3D</button><button data-v="top">Superior</button><button data-v="follow">Seguir</button></div>
+            </div>
+          </div>
+          <div class="scene scene-tall" id="dojo-scene"></div>
+          <div class="overlay bl glass legend" id="dojo-legend"></div>
+          <div class="overlay br glass legend" style="min-width:150px">
+            <div class="li"><span class="label">Distancia al borde</span></div>
+            <div class="li"><span class="num" style="font-size:20px;font-weight:650" id="edge-dist">—</span></div>
+          </div>
+        </div>
+
+        <div class="card c4 pad0">
+          <div class="card-h"><div class="ico"><i data-lucide="hand"></i></div><div><h2>Mano del operador</h2><div class="sub">Orientación (MPU6050 · filtro de Mahony)</div></div></div>
+          <div class="scene scene-mid" id="hand-scene"></div>
+          <div style="padding: 0 16px 16px">
+            <div class="rpy">
+              <div class="box"><div class="label">Roll</div><div class="num" id="rpy-r">0.0°</div></div>
+              <div class="box"><div class="label">Pitch</div><div class="num" id="rpy-p">0.0°</div></div>
+              <div class="box"><div class="label">Yaw</div><div class="num" id="rpy-y">0.0°</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card c4">
+          <div class="card-h"><div class="ico"><i data-lucide="rotate-3d"></i></div><div><h2>Mando por inclinación</h2><div class="sub">Estrategia 2 · pitch → v, roll → ω</div></div></div>
+          <canvas class="plot2d" id="tilt-pad" style="height:340px"></canvas>
+        </div>
+
+        <div class="card c4">
+          <div class="card-h"><div class="ico"><i data-lucide="move"></i></div><div><h2>Mano en el plano</h2><div class="sub">Estrategia 1 · posición y velocidad estimadas</div></div>
+            <div class="right"><button class="btn sm ghost" id="btn-hand-reset" title="Posición de la mano a cero"><i data-lucide="rotate-ccw"></i></button></div>
+          </div>
+          <canvas class="plot2d" id="hand-plane" style="height:340px"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= SENALES ================= -->
+    <section class="view" id="view-signals">
+      <div class="card" style="margin-bottom:18px">
+        <div class="row" style="flex-wrap:wrap; gap:14px">
+          <div class="ico" style="width:31px;height:31px;border-radius:10px;display:grid;place-items:center;background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent-2)"><i data-lucide="activity"></i></div>
+          <div><h2 style="margin:0;font-size:14px">Filtrado de señales de bajo nivel</h2><div class="muted" style="font-size:12px">Señal cruda frente a filtrada en cada microcontrolador · σΔ = desviación estándar de la diferencia entre muestras (ruido de alta frecuencia)</div></div>
+          <div class="grow" style="flex:1"></div>
+          <div class="label">Eje</div>
+          <div class="seg" id="seg-axis"><button data-v="0" class="on">X</button><button data-v="1">Y</button><button data-v="2">Z</button></div>
+          <div class="label">Ventana</div>
+          <div class="seg" id="seg-window"><button data-v="10">10 s</button><button data-v="20" class="on">20 s</button><button data-v="40">40 s</button></div>
+          <button class="btn sm" id="btn-pause"><i data-lucide="pause"></i><span>Pausar</span></button>
+        </div>
+      </div>
+      <div class="grid" id="signals-grid"></div>
+    </section>
+
+    <!-- ================= KALMAN ================= -->
+    <section class="view" id="view-kalman">
+      <div class="kpis" id="kpis" style="margin-bottom:18px"></div>
+      <div class="grid">
+        <div class="card c6">
+          <div class="card-h"><div class="ico"><i data-lucide="route"></i></div><div><h2>Trayectoria del robot</h2><div class="sub">EKF vs UKF vs odometría del ESP32</div></div>
+            <div class="right"><button class="btn sm ghost" id="btn-clear-traj"><i data-lucide="eraser"></i></button></div></div>
+          <canvas class="plot2d" id="robot-traj" style="height:380px"></canvas>
+        </div>
+        <div class="card c6">
+          <div class="card-h"><div class="ico"><i data-lucide="hand"></i></div><div><h2>Trayectoria de la mano</h2><div class="sub">Posición estimada (variable no medible)</div></div></div>
+          <canvas class="plot2d" id="hand-traj" style="height:380px"></canvas>
+        </div>
+      </div>
+      <div class="grid" id="kalman-charts" style="margin-top:18px"></div>
+
+      <div class="grid" style="margin-top:18px">
+        <div class="card c12">
+          <div class="card-h"><div class="ico"><i data-lucide="flask-conical"></i></div>
+            <div><h2>Benchmark EKF vs UKF</h2><div class="sub">Datos simulados con verdad conocida · tiempo de cómputo, memoria y error en variables no medidas</div></div>
+            <div class="right">
+              <select class="input" id="bench-steps"><option value="800">800 pasos</option><option value="1500" selected>1500 pasos</option><option value="3000">3000 pasos</option></select>
+              <button class="btn primary" id="btn-bench"><i data-lucide="play"></i>Ejecutar</button>
+            </div>
+          </div>
+          <div id="bench-out"><div class="empty"><i data-lucide="flask-conical"></i>Ejecuta el benchmark para comparar los filtros</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= EXPERIMENTOS ================= -->
+    <section class="view" id="view-experiments">
+      <div class="card" style="margin-bottom:18px">
+        <div class="row" style="flex-wrap:wrap; gap:14px">
+          <div class="seg" id="seg-exp-strategy"><button data-v="1">Estrategia 1 · Plano</button><button data-v="2" class="on">Estrategia 2 · Inclinación</button></div>
+          <div class="seg" id="seg-exp-cond">
+            <button data-v="base" class="on">Sin filtrado</button>
+            <button data-v="filtrado">Filtrado</button>
+            <button data-v="ekf">EKF</button>
+            <button data-v="ukf">UKF</button>
+          </div>
+          <div style="flex:1"></div>
+          <a class="btn sm" href="api/experiments.csv"><i data-lucide="download"></i>Exportar CSV</a>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="card c8">
+          <div class="card-h"><div class="ico"><i data-lucide="table-2"></i></div><div><h2 id="exp-title">Tabla de posiciones</h2><div class="sub" id="exp-sub"></div></div></div>
+          <div class="row" style="flex-wrap:wrap; margin-bottom:14px">
+            <input class="input" id="exp-point" placeholder="Punto (ej. P1)" style="width:120px">
+            <input class="input xs" id="exp-x" placeholder="x (m)" type="number" step="0.01">
+            <input class="input xs" id="exp-y" placeholder="y (m)" type="number" step="0.01">
+            <button class="btn sm primary" id="exp-add"><i data-lucide="plus"></i>Agregar punto</button>
+            <div style="flex:1"></div>
+            <select class="input" id="exp-copy-from" style="height:31px"><option value="">Copiar puntos de…</option></select>
+            <button class="btn sm ghost" id="exp-clear" title="Vaciar esta tabla"><i data-lucide="trash-2"></i></button>
+          </div>
+          <div id="exp-table"></div>
+          <div class="callout" style="margin-top:14px">
+            Lleva el robot a cada punto con el guante. Al llegar pulsa <b>Capturar</b> (guarda la estimación del momento), mide la posición real con cinta sobre el dojo y escríbela en <b>Medida</b>.
+            Repite <b>los mismos puntos</b> en cada condición (sin filtrado → filtrado → EKF → UKF), como pide la guía.
+          </div>
+        </div>
+        <div class="card c4">
+          <div class="card-h"><div class="ico"><i data-lucide="map-pin"></i></div><div><h2>Mapa de puntos</h2><div class="sub">Esperada · medida · estimada</div></div></div>
+          <canvas class="plot2d" id="exp-map" style="height:300px"></canvas>
+          <div class="divider" style="margin:16px 0"></div>
+          <div class="card-h" style="margin-bottom:10px"><h2>Error promedio</h2><div class="sub">por condición</div></div>
+          <div id="exp-summary"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= OFFLINE ================= -->
+    <section class="view" id="view-offline">
+      <div class="grid">
+        <div class="card c4">
+          <div class="card-h"><div class="ico"><i data-lucide="database"></i></div><div><h2>Sesiones grabadas</h2><div class="sub">~/teleop_data/sessions</div></div>
+            <div class="right"><button class="btn sm ghost" id="btn-sessions"><i data-lucide="refresh-cw"></i></button></div></div>
+          <div class="row" style="margin-bottom:12px">
+            <input class="input" id="rec-label" placeholder="Nombre de la próxima grabación" style="flex:1">
+          </div>
+          <div class="list" id="sessions"></div>
+          <div class="divider" style="margin:16px 0"></div>
+          <div class="stack">
+            <div><div class="label" style="margin-bottom:8px">Giroscopio del robot</div>
+              <div class="seg full" id="seg-off-robot"><button data-v="raw" class="on">Crudo + sesgo</button><button data-v="filtered">Filtrado ESP32</button></div></div>
+            <div><div class="label" style="margin-bottom:8px">Aceleración de la mano</div>
+              <div class="seg full" id="seg-off-hand"><button data-v="raw">Cruda</button><button data-v="filtered" class="on">Filtrada</button></div></div>
+            <button class="btn primary" id="btn-offline" disabled><i data-lucide="play"></i>Re-ejecutar EKF y UKF</button>
+          </div>
+        </div>
+        <div class="card c8">
+          <div class="card-h"><div class="ico"><i data-lucide="chart-spline"></i></div><div><h2>Resultado offline</h2><div class="sub" id="off-sub">Elige una sesión</div></div></div>
+          <div id="off-out"><div class="empty"><i data-lucide="database"></i>Graba una sesión con el botón <b>Grabar</b> y vuelve a correr los filtros aquí para ajustarlos sin el robot</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= AJUSTES ================= -->
+    <!-- ================= ENERGIA ================= -->
+    <section class="view" id="view-energy">
+      <div class="energy-alert" id="en-alert"><i data-lucide="triangle-alert"></i><span></span></div>
+      <div class="grid">
+        <div class="card c4 en-hero-card">
+          <div class="card-h"><div class="ico"><i data-lucide="battery-charging"></i></div><div><h2>Alimentación del sistema</h2><div class="sub">2 × Beston BST-9V en paralelo · Ni-MH · 500 mAh</div></div></div>
+          <div class="en-hero">
+            <div class="en-batt" id="en-batt">
+              <svg viewBox="0 0 140 250" class="en-batt-svg" aria-hidden="true">
+                <defs>
+                  <clipPath id="en-clip"><rect x="10" y="22" width="120" height="218" rx="22"/></clipPath>
+                  <linearGradient id="en-grad" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0" class="g0"/><stop offset="0.55" class="g1"/><stop offset="1" class="g0"/>
+                  </linearGradient>
+                  <linearGradient id="en-gloss" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="0.22" stop-color="#fff" stop-opacity="0.22"/>
+                    <stop offset="0.38" stop-color="#fff" stop-opacity="0"/>
+                  </linearGradient>
+                </defs>
+                <rect x="48" y="4" width="44" height="16" rx="6" class="en-cap"/>
+                <rect x="10" y="22" width="120" height="218" rx="22" class="en-shell"/>
+                <g clip-path="url(#en-clip)">
+                  <g id="en-level">
+                    <path id="en-wave2" class="en-wave2" d=""/>
+                    <path id="en-wave" class="en-wave" d=""/>
+                  </g>
+                  <g class="en-ticks">
+                    <line x1="10" x2="26" y1="76.5" y2="76.5"/><line x1="10" x2="26" y1="131" y2="131"/><line x1="10" x2="26" y1="185.5" y2="185.5"/>
+                  </g>
+                  <rect x="10" y="22" width="120" height="218" fill="url(#en-gloss)"/>
+                </g>
+                <rect x="10" y="22" width="120" height="218" rx="22" class="en-rim"/>
+              </svg>
+            </div>
+            <div class="en-hero-txt">
+              <div class="en-pct"><span id="en-pct">—</span><small>%</small></div>
+              <div class="en-status" id="en-status"><i data-lucide="circle-dashed"></i><span>Sin datos</span></div>
+              <div class="en-runtime">
+                <div class="label">Autonomía estimada</div>
+                <div class="num" id="en-runtime">—</div>
+                <div class="foot" id="en-runtime-foot">con el consumo medio de los últimos 30 s</div>
+              </div>
+              <div class="en-remaining">
+                <div class="label">Carga restante</div>
+                <div class="num" id="en-remaining">—</div>
+                <div class="en-bar"><div id="en-remaining-bar"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card c8">
+          <div class="card-h"><div class="ico"><i data-lucide="gauge"></i></div><div><h2>Medidas en vivo</h2><div class="sub">INA219 en serie con la batería · 10 Hz en el ESP32</div></div>
+            <div class="right"><span class="chip" id="en-link"><span class="dot"></span><b>INA219</b><span class="hz">—</span></span></div></div>
+          <div class="en-kpis" id="en-kpis"></div>
+        </div>
+
+        <div class="card c12 pad-sm">
+          <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:10px">
+            <div class="label">Historial</div>
+            <div class="seg" id="seg-en-window"><button data-v="60">1 min</button><button data-v="300" class="on">5 min</button><button data-v="900">15 min</button></div>
+          </div>
+        </div>
+        <div id="en-charts" class="grid c12 en-charts"></div>
+
+        <div class="card c12 en-spec-card">
+          <div class="card-h"><div class="ico"><i data-lucide="battery-full"></i></div><div><h2>Ficha de la batería</h2><div class="sub">2 × Beston BST-9V en paralelo</div></div>
+            <div class="right"><button class="btn sm ghost" id="en-reset" title="Reinicia los acumulados de la sesión (energía, pico, mínimo)"><i data-lucide="rotate-ccw"></i>Nueva sesión</button></div></div>
+          <div class="en-spec-layout">
+            <div class="en-range">
+              <div class="label">Rango de tensión</div>
+              <div class="en-gauge">
+                <svg viewBox="0 0 280 168" class="en-gauge-svg" id="en-gauge" aria-label="Tensión de la alimentación en su rango">
+                  <defs>
+                    <linearGradient id="eg-prog-grad" gradientUnits="userSpaceOnUse" x1="22" y1="0" x2="258" y2="0">
+                      <stop offset="0" class="eg-p0"/><stop offset="1" class="eg-p1"/>
+                    </linearGradient>
+                    <filter id="eg-glow" x="-30%" y="-30%" width="160%" height="160%">
+                      <feGaussianBlur stdDeviation="5" result="b"/>
+                      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+                    </filter>
+                  </defs>
+                  <g id="eg-zones" class="eg-zones"></g>
+                  <path class="eg-track" id="eg-track"/>
+                  <path class="eg-prog" id="eg-prog" filter="url(#eg-glow)"/>
+                  <g id="eg-ticks" class="eg-ticks"></g>
+                  <g id="eg-knob" class="eg-knob"><circle r="11" class="k-out"/><circle r="5" class="k-in"/></g>
+                </svg>
+                <div class="en-gauge-val"><div><span class="num" id="en-range-v">—</span><small>V</small></div><div class="en-gauge-sub" id="en-range-state">—</div></div>
+              </div>
+              <div class="en-range-foot"><span id="en-range-cell">—</span><span class="en-range-legend"><i class="lg-bad"></i>vacía <i class="lg-warn"></i>baja <i class="lg-ok"></i>normal</span></div>
+            </div>
+            <div class="en-spec" id="en-spec"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-settings">
+      <div class="grid">
+        <div class="card c4"><div class="card-h"><div class="ico"><i data-lucide="gauge"></i></div><h2>Tele-operación</h2></div><div id="set-teleop"></div></div>
+        <div class="card c4"><div class="card-h"><div class="ico"><i data-lucide="car"></i></div><h2>Estimador del robot</h2></div><div id="set-robot"></div></div>
+        <div class="card c4"><div class="card-h"><div class="ico"><i data-lucide="hand"></i></div><h2>Estimador de la mano</h2></div><div id="set-hand"></div></div>
+        <div class="card c12"><div class="card-h"><div class="ico"><i data-lucide="key-round"></i></div><h2>Acceso remoto</h2></div><div id="set-access"></div></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script src="vendor/lucide.min.js"></script>
+<script src="vendor/uPlot.iife.min.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

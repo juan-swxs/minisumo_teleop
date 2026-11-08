@@ -1,0 +1,63 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+      Cell Size: 0.1
+      Plane Cell Count: 12
+      Color: 90; 90; 100
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Dojo
+      Enabled: true
+      Topic:
+        Value: /dojo/markers
+        Durability Policy: Transient Local
+    - Class: rviz_default_plugins/Odometry
+      Name: Robot EKF
+      Enabled: true
+      Topic:
+        Value: /robot/ekf/odom
+      Keep: 200
+      Shape:
+        Value: Arrow
+        Color: 34; 211; 238
+        Shaft Length: 0.06
+        Shaft Radius: 0.006
+        Head Length: 0.025
+        Head Radius: 0.015
+      Covariance:
+        Value: true
+    - Class: rviz_default_plugins/Odometry
+      Name: Robot UKF
+      Enabled: true
+      Topic:
+        Value: /robot/ukf/odom
+      Keep: 200
+      Shape:
+        Value: Arrow
+        Color: 167; 139; 250
+        Shaft Length: 0.06
+        Shaft Radius: 0.006
+        Head Length: 0.025
+        Head Radius: 0.015
+      Covariance:
+        Value: false
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Enabled: true
+  Global Options:
+    Fixed Frame: dojo
+    Background Color: 16; 18; 24
+  Views:
+    Current:
+      Class: rviz_default_plugins/TopDownOrtho
+      Scale: 900
+      X: 0
+      Y: 0
+Window Geometry:
+  Width: 1100
+  Height: 800
